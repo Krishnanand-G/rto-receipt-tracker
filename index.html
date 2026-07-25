@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RTO Receipt → Road Tax Tracker</title>
+<!-- Added Favicon -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📄</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "text-high-contrast": "#ffffff",
+                "secondary-fixed": "#f0dbff",
+                "on-secondary-fixed-variant": "#6900b3",
+                "tertiary": "#89ceff",
+                "glow-indigo": "rgba(99, 102, 241, 0.15)",
+                "on-secondary-fixed": "#2c0051",
+                "surface-elevated": "#1a1a1a",
+                "on-primary": "#1000a9",
+                "on-primary-container": "#0d0096",
+                "outline": "#908fa0",
+                "on-tertiary-fixed-variant": "#004c6e",
+                "on-background": "#e5e2e1",
+                "primary": "#c0c1ff",
+                "on-error-container": "#ffdad6",
+                "surface": "#131313",
+                "on-tertiary-container": "#002d43",
+                "on-primary-fixed": "#07006c",
+                "primary-fixed": "#e1e0ff",
+                "surface-variant": "#353534",
+                "surface-dim": "#131313",
+                "on-surface-variant": "#c7c4d7",
+                "tertiary-fixed": "#c9e6ff",
+                "inverse-primary": "#494bd6",
+                "surface-container-lowest": "#0e0e0e",
+                "on-error": "#690005",
+                "primary-container": "#8083ff",
+                "tertiary-fixed-dim": "#89ceff",
+                "surface-tint": "#c0c1ff",
+                "surface-container-highest": "#353534",
+                "surface-container-low": "#1c1b1b",
+                "surface-container-high": "#2a2a2a",
+                "surface-container": "#201f1f",
+                "tertiary-container": "#009ada",
+                "on-tertiary-fixed": "#001e2f",
+                "error-container": "#93000a",
+                "surface-base": "#0a0a0a",
+                "border-subtle": "rgba(255, 255, 255, 0.08)",
+                "on-tertiary": "#00344d",
+                "inverse-surface": "#e5e2e1",
+                "on-secondary": "#490080",
+                "on-secondary-container": "#d6a9ff",
+                "surface-bright": "#3a3939",
+                "on-surface": "#e5e2e1",
+                "error": "#ffb4ab",
+                "secondary": "#ddb7ff",
+                "primary-fixed-dim": "#c0c1ff",
+                "background": "#131313",
+                "text-muted": "#a1a1aa",
+                "inverse-on-surface": "#313030",
+                "on-primary-fixed-variant": "#2f2ebe",
+                "outline-variant": "#464554",
+                "secondary-fixed-dim": "#ddb7ff",
+                "secondary-container": "#6f00be"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "margin-mobile": "16px",
+                "gutter": "24px",
+                "unit": "4px",
+                "max-width": "1280px",
+                "margin-desktop": "64px",
+                "md": "16px",
+                "lg": "24px",
+                "xl": "40px",
+                "xs": "4px",
+                "sm": "8px",
+        },
+        "fontFamily": {
+                "body-md": ["Inter"],
+                "label-md": ["JetBrains Mono"],
+                "headline-lg-mobile": ["Hanken Grotesk"],
+                "headline-lg": ["Hanken Grotesk"],
+                "body-lg": ["Inter"],
+                "code-sm": ["JetBrains Mono"],
+                "display-lg": ["Hanken Grotesk"],
+                "headline-md": ["Hanken Grotesk"]
+        }
+      }
+    }
+  }
+</script>
+<style>
+  /* Custom UI Styles */
+  .drop-zone-active {
+      border-color: #494bd6; /* inverse-primary */
+      background-color: rgba(99, 102, 241, 0.05);
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.15);
+  }
+  #drop.compact {
+      padding: 24px;
+      min-height: auto;
+  }
+  #drop.compact .drop-icon-wrapper { display: none; }
+  #drop.compact .drop-tip { display: none; }
+
+  /* Table styling */
+  .tab {
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background-color: rgba(53, 53, 52, 0.5); /* surface-variant */
+      border: 1px solid rgba(255, 255, 255, 0.08); /* border-subtle */
+      color: #a1a1aa; /* text-muted */
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+  }
+  .tab:hover { border-color: #464554; /* outline-variant */ }
+  .tab.active {
+      background-color: #494bd6; /* inverse-primary */
+      border-color: #494bd6;
+      color: #ffffff;
+  }
+
+  tbody tr:hover { background-color: rgba(26, 26, 26, 0.5); }
+  tbody td {
+      padding: 10px 12px;
+      white-space: nowrap;
+      color: #e5e2e1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  tr.hidden-row { display: none !important; }
+  .mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+  }
+  .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+  }
+  .status-dot.ok { background-color: #37b980; }
+  .status-dot.warn { background-color: #e6ab35; }
+  .status-dot.err { background-color: #ffb4ab; }
+  .issue-text { color: #e6ab35; font-size: 12px; }
+  .issue-text.err { color: #ffb4ab; }
+
+  /* Result bar */
+  #resultBar.cancelled {
+      background-color: rgba(230, 171, 53, 0.1);
+      border-color: rgba(230, 171, 53, 0.3);
+  }
+  #resultBar b { color: #37b980; }
+  #resultBar.cancelled b { color: #e6ab35; }
+  
+  /* Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+</style>
+</head>
+<body class="min-h-screen font-body-md text-on-surface bg-background flex flex-col items-center justify-start">
+<main class="flex-grow w-full max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop py-xl flex flex-col gap-xl">
+
+<!-- Header Section -->
+<header class="flex flex-col gap-md text-center items-center">
+  <h1 class="font-headline-lg text-[32px] md:text-[48px] font-bold text-text-high-contrast leading-tight tracking-tight">RTO Receipt Tracker</h1>
+  <p class="text-text-muted max-w-2xl text-[16px] md:text-[18px]">
+      Extract data from Vahan/RTO cash-receipt PDFs into a filled Excel tracker. Processing runs locally in your browser.
+  </p>
+  <div class="flex flex-wrap justify-center gap-sm mt-sm">
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-elevated/50 backdrop-blur-sm border border-border-subtle text-[14px] font-medium text-on-surface tracking-wide">
+          <span class="material-symbols-outlined text-[16px] text-inverse-primary">check_circle</span> Template pre-loaded
+      </div>
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-elevated/50 backdrop-blur-sm border border-border-subtle text-[14px] font-medium text-on-surface tracking-wide">
+          <span class="material-symbols-outlined text-[16px] text-inverse-primary">computer</span> Runs 100% locally
+      </div>
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-elevated/50 backdrop-blur-sm border border-border-subtle text-[14px] font-medium text-on-surface tracking-wide">
+          <span class="material-symbols-outlined text-[16px] text-inverse-primary">library_add_check</span> Handles 10,000+ PDFs
+      </div>
+      <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-elevated/50 backdrop-blur-sm border border-border-subtle text-[14px] font-medium text-on-surface tracking-wide">
+          <span class="material-symbols-outlined text-[16px] text-inverse-primary">shield_lock</span> No Server Uploads
+      </div>
+  </div>
+</header>
+
+<!-- Interactive Area: Dropzone, Status, Stats -->
+<div class="flex flex-col gap-4 w-full">
+  <!-- Drop Zone -->
+  <section class="bg-surface-elevated/40 backdrop-blur-md rounded-xl border border-border-subtle p-lg transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-lg" id="drop">
+      <div class="absolute inset-0 bg-glow-indigo opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+      <div class="border-2 border-dashed border-outline-variant rounded-lg p-xl flex flex-col items-center justify-center text-center gap-md min-h-[250px] group-hover:border-inverse-primary/50 transition-colors duration-300" style="min-height: inherit;">
+          <span class="material-symbols-outlined text-[48px] text-text-muted opacity-60 group-hover:text-inverse-primary transition-colors duration-300 drop-icon-wrapper">cloud_upload</span>
+          <div class="flex flex-col gap-xs">
+              <h3 class="text-[24px] md:text-[32px] font-semibold text-text-high-contrast group-hover:text-inverse-primary transition-colors duration-300 leading-tight">Drag &amp; drop RTO receipt PDFs here</h3>
+              <p class="text-text-muted text-[16px] drop-title">or click to browse — select as many files as you like, processing begins immediately</p>
+          </div>
+          <div class="mt-sm drop-actions">
+              <label class="bg-inverse-primary text-text-high-contrast px-6 py-2.5 rounded font-medium text-[14px] hover:bg-inverse-primary/90 transition-colors cursor-pointer shadow-sm tracking-wide" for="pdfInput" onclick="event.stopPropagation()">
+                  Choose files
+              </label>
+          </div>
+          <p class="text-text-muted/60 font-mono text-[13px] mt-md max-w-lg drop-tip">
+              Tip: open the folder in your file explorer, press Ctrl+A (Cmd+A on Mac) to select everything, then drag the whole selection in here — same result as picking a folder.
+          </p>
+          <input type="file" id="pdfInput" accept=".pdf" multiple class="hidden">
+      </div>
+  </section>
+
+  <!-- Live status bar -->
+  <div class="items-center justify-between gap-4 flex-wrap bg-surface-elevated/40 backdrop-blur-md rounded-xl border border-border-subtle p-md shadow-lg" id="statusRow" style="display:none;">
+    <div class="flex items-center gap-4">
+      <div class="w-5 h-5 rounded-full border-2 border-surface-bright border-t-primary animate-spin" id="spinner"></div>
+      <div>
+        <div class="font-semibold text-text-high-contrast text-[14px]" id="statusText">Processing…</div>
+        <div class="text-[12.5px] text-text-muted mt-0.5" id="statusSub"></div>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button class="bg-transparent border border-error/30 text-error px-4 py-1.5 rounded font-medium tracking-wide text-[14px] hover:bg-error/10 hover:border-error transition-colors" id="cancelBtn">Stop</button>
+      <button class="bg-surface-variant text-text-high-contrast px-4 py-1.5 rounded font-medium tracking-wide text-[14px] border border-border-subtle hover:border-inverse-primary transition-colors" id="resetBtn" style="display:none">Start over</button>
+    </div>
+  </div>
+
+  <div class="h-2 bg-surface-container-high rounded-full overflow-hidden border border-border-subtle" id="progressBarBg" style="display:none;">
+    <div class="h-full w-0 bg-gradient-to-r from-primary to-[#37b980] transition-all duration-150" id="progressFill"></div>
+  </div>
+
+  <div class="grid-cols-2 md:grid-cols-4 gap-3" id="stats" style="display:none;">
+    <div class="bg-surface-elevated/50 border border-border-subtle rounded-lg p-3">
+      <div class="text-[24px] font-bold leading-none tabular-nums text-text-high-contrast" id="statTotal">0</div>
+      <div class="text-[11px] text-text-muted mt-1.5 font-semibold uppercase tracking-wider">Total files</div>
+    </div>
+    <div class="bg-surface-elevated/50 border border-border-subtle rounded-lg p-3">
+      <div class="text-[24px] font-bold leading-none tabular-nums text-[#37b980]" id="statOk">0</div>
+      <div class="text-[11px] text-text-muted mt-1.5 font-semibold uppercase tracking-wider">Clean rows</div>
+    </div>
+    <div class="bg-surface-elevated/50 border border-border-subtle rounded-lg p-3">
+      <div class="text-[24px] font-bold leading-none tabular-nums text-[#e6ab35]" id="statWarn">0</div>
+      <div class="text-[11px] text-text-muted mt-1.5 font-semibold uppercase tracking-wider">Missing a field</div>
+    </div>
+    <div class="bg-surface-elevated/50 border border-border-subtle rounded-lg p-3">
+      <div class="text-[24px] font-bold leading-none tabular-nums text-error" id="statErr">0</div>
+      <div class="text-[11px] text-text-muted mt-1.5 font-semibold uppercase tracking-wider">Unreadable PDFs</div>
+    </div>
+  </div>
+
+  <!-- Fix Issues Section -->
+  <section class="bg-surface-elevated/80 backdrop-blur-md rounded-xl border border-error/40 shadow-xl flex flex-col w-full relative overflow-hidden" id="fixIssuesCard" style="display:none;">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-error/80 to-error/40"></div>
+    <div class="p-lg pb-4 flex flex-col gap-4">
+      <div class="flex items-center gap-3 border-b border-border-subtle pb-sm">
+          <span class="material-symbols-outlined text-error text-[28px]">warning</span>
+          <h2 class="text-[20px] md:text-[24px] font-semibold text-text-high-contrast leading-tight">Action Required: Missing Fields</h2>
+      </div>
+      <p class="text-[14.5px] text-text-muted" id="fixIssuesText"></p>
+      
+      <div class="flex flex-col gap-3 max-h-[50vh] overflow-auto custom-scrollbar pr-2" id="fixIssuesList">
+        <!-- Issue cards -->
+      </div>
+
+      <div class="pt-5 border-t border-border-subtle flex flex-wrap justify-end gap-3">
+        <button class="bg-surface-variant text-text-high-contrast px-5 py-2.5 rounded font-medium text-[14px] border border-border-subtle hover:border-text-muted transition-colors" id="skipFixesBtn">Skip & Download As-Is</button>
+        <button class="bg-primary text-on-primary px-6 py-2.5 rounded font-semibold text-[14px] hover:bg-primary/90 transition-colors shadow-sm" id="confirmFixesBtn">Confirm Fixes</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="items-center justify-between gap-4 flex-wrap p-4 bg-surface-elevated/80 border border-border-subtle rounded-xl shadow-lg" id="resultBar" style="display:none;">
+    <div>
+      <div class="text-[14px] text-text-high-contrast" id="resultMsg"></div>
+      <div class="text-[12.5px] text-text-muted mt-1" id="resultSub"></div>
+    </div>
+    <button class="bg-inverse-primary text-text-high-contrast px-5 py-2.5 rounded font-medium tracking-wide text-[14px] hover:bg-inverse-primary/90 transition-colors shadow-sm flex items-center gap-2" id="downloadBtn">
+      <span class="material-symbols-outlined text-[18px]">download</span> Download filled tracker
+    </button>
+  </div>
+</div>
+
+<!-- Table Section -->
+<section class="bg-surface-elevated/40 backdrop-blur-md rounded-xl border border-border-subtle p-lg shadow-lg flex flex-col gap-4 w-full" id="tableCard" style="display:none;">
+  <div class="flex items-center justify-between flex-wrap gap-3 border-b border-border-subtle pb-3" id="tableHeadRow" style="display:none;">
+    <div class="flex gap-2">
+      <div class="tab active" id="tabAll">All <span class="opacity-80 font-medium ml-1" id="tabAllCnt">0</span></div>
+      <div class="tab" id="tabIssues">Needs a look <span class="opacity-80 font-medium ml-1" id="tabIssuesCnt">0</span></div>
+    </div>
+  </div>
+  <div class="max-h-[400px] overflow-auto border border-border-subtle rounded-lg custom-scrollbar" id="tableScroll" style="display:none;">
+    <table class="w-full text-left border-collapse text-[13px]">
+      <thead class="sticky top-0 bg-surface-container-high text-text-muted font-semibold text-[11px] uppercase tracking-wider shadow-sm z-10">
+        <tr>
+          <th class="px-3 py-2.5 border-b border-border-subtle w-8"></th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">File</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">Sl.No</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">Customer</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">VIN</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">Challan No.</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">Challan Date</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">Road Tax</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">Issue</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <div class="text-[13px] text-text-muted p-6 text-center" id="emptyHint" style="display:none;">No rows match this filter.</div>
+  <div class="text-[12px] text-text-muted mt-2" id="tableNote" style="display:none;"></div>
+</section>
+
+
+</main>
+
+<footer class="w-full mt-auto py-lg text-center">
+  <div class="font-mono text-[13px] text-text-muted/70 cursor-default">
+      Everything runs client-side in your browser · pdf.js + ExcelJS
+  </div>
+</footer>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const TEMPLATE_B64 = "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";
+
+function b64ToArrayBuffer(b64){
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+const dropZone = document.getElementById('drop');
+const pdfInput = document.getElementById('pdfInput');
+const statusRow = document.getElementById('statusRow');
+const spinner = document.getElementById('spinner');
+const statusText = document.getElementById('statusText');
+const statusSub = document.getElementById('statusSub');
+const cancelBtn = document.getElementById('cancelBtn');
+const resetBtn = document.getElementById('resetBtn');
+const progressBarBg = document.getElementById('progressBarBg');
+const progressFill = document.getElementById('progressFill');
+const statsEl = document.getElementById('stats');
+const statTotal = document.getElementById('statTotal');
+const statOk = document.getElementById('statOk');
+const statWarn = document.getElementById('statWarn');
+const statErr = document.getElementById('statErr');
+const resultBar = document.getElementById('resultBar');
+const resultMsg = document.getElementById('resultMsg');
+const resultSub = document.getElementById('resultSub');
+const downloadBtn = document.getElementById('downloadBtn');
+const tableCard = document.getElementById('tableCard');
+const tableHeadRow = document.getElementById('tableHeadRow');
+const tableScroll = document.getElementById('tableScroll');
+const tableBody = document.getElementById('tableBody');
+const tableNote = document.getElementById('tableNote');
+const emptyHint = document.getElementById('emptyHint');
+const tabAll = document.getElementById('tabAll');
+const tabIssues = document.getElementById('tabIssues');
+const tabAllCnt = document.getElementById('tabAllCnt');
+const tabIssuesCnt = document.getElementById('tabIssuesCnt');
+const fixIssuesCard = document.getElementById('fixIssuesCard');
+const fixIssuesText = document.getElementById('fixIssuesText');
+const fixIssuesList = document.getElementById('fixIssuesList');
+const confirmFixesBtn = document.getElementById('confirmFixesBtn');
+const skipFixesBtn = document.getElementById('skipFixesBtn');
+
+const PREVIEW_CAP = 1000;
+let currentRows = [];
+let issuesList = [];
+let cancelled = false;
+let running = false;
+let currentFilter = 'all';
+
+dropZone.addEventListener('click', ()=> pdfInput.click());
+['dragenter','dragover'].forEach(evt=>{
+  dropZone.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drop-zone-active'); });
+});
+['dragleave','drop'].forEach(evt=>{
+  dropZone.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drop-zone-active'); });
+});
+dropZone.addEventListener('drop', e=>{
+  const dt = e.dataTransfer;
+  if(dt && dt.files && dt.files.length) startBatch(dt.files);
+});
+pdfInput.addEventListener('change', e=>{
+  if(e.target.files && e.target.files.length) startBatch(e.target.files);
+  e.target.value = '';
+});
+
+cancelBtn.addEventListener('click', ()=>{ cancelled = true; });
+resetBtn.addEventListener('click', resetAll);
+
+function resetAll(){
+  cancelled = false;
+  running = false;
+  dropZone.classList.remove('compact');
+  spinner.style.display = '';
+  statusRow.style.display = 'none';
+  progressBarBg.style.display = 'none';
+  progressFill.style.width = '0%';
+  statsEl.style.display = 'none';
+  resultBar.style.display = 'none';
+  tableCard.style.display = 'none';
+  tableHeadRow.style.display = 'none';
+  tableScroll.style.display = 'none';
+  tableNote.style.display = 'none';
+  tableBody.innerHTML = '';
+  currentFilter = 'all';
+  currentRows = [];
+  issuesList = [];
+  if(fixIssuesCard) fixIssuesCard.style.display = 'none';
+  tabAll.classList.add('active'); tabIssues.classList.remove('active');
+}
+
+tabAll.addEventListener('click', ()=> setFilter('all'));
+tabIssues.addEventListener('click', ()=> setFilter('issues'));
+function setFilter(f){
+  currentFilter = f;
+  tabAll.classList.toggle('active', f==='all');
+  tabIssues.classList.toggle('active', f==='issues');
+  applyFilter();
+}
+function applyFilter(){
+  let visibleCount = 0;
+  tableBody.querySelectorAll('tr').forEach(tr=>{
+    const show = currentFilter === 'all' || tr.dataset.status !== 'ok';
+    tr.classList.toggle('hidden-row', !show);
+    if(show) visibleCount++;
+  });
+  emptyHint.style.display = visibleCount === 0 ? 'block' : 'none';
+}
+
+const MONTHS = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+
+function extractFields(text){
+  const result = { customerName:'', vin:'', challanNo:'', challanDate:'', roadTax:'' };
+  const warnings = [];
+  let m;
+
+  m = text.match(/RECEIPT\/APPL\s*No\s*:\s*([A-Za-z0-9]+)\s*\//);
+  if(m) result.challanNo = m[1].trim();
+  else warnings.push('Challan No.');
+
+  m = text.match(/Received From:\s*([^\n\r]+?)\s*(?:\n|Receipt date:)/);
+  if(m) result.customerName = m[1].trim();
+  else warnings.push('Customer name');
+
+  m = text.match(/Receipt date:\s*(\d{1,2}-[A-Za-z]{3}-\d{4})/);
+  if(m) result.challanDate = m[1].trim(); 
+  else warnings.push('Challan date');
+
+  m = text.match(/Chassis No:\s*([A-Za-z0-9]+)/);
+  if(m) result.vin = m[1].trim();
+  else warnings.push('VIN');
+
+  m = text.match(/GRAND TOTAL\s*\(in Rs\):\s*([\d,]+)/);
+  if(m) result.roadTax = Number(m[1].replace(/,/g,''));
+  else warnings.push('Road tax amount');
+
+  return { result, warnings };
+}
+
+async function extractTextFromPdf(arrayBuffer){
+  const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let full = '';
+  const numPages = Math.min(doc.numPages, 2);
+  for(let i=1;i<=numPages;i++){
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    full += content.items.map(it=>it.str).join(' ') + '\n';
+  }
+  doc.destroy();
+  return full;
+}
+
+function fmtTime(sec){
+  if(!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec/60), s = Math.round(sec%60);
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function addPreviewRow(status, fileName, sl, r, warnings, rowIdx){
+  if(tableBody.children.length >= PREVIEW_CAP) return;
+  const tr = document.createElement('tr');
+  tr.dataset.status = status;
+  tr.dataset.idx = rowIdx;
+  const dotClass = status === 'ok' ? 'ok' : status === 'warn' ? 'warn' : 'err';
+  const issueText = status === 'err'
+    ? 'Could not read PDF'
+    : (warnings && warnings.length ? warnings.join(', ') : '');
+  const issueClass = status === 'err' ? 'issue-text err' : 'issue-text';
+  
+  const cell = (key, val, placeholder) => {
+    const isMissing = warnings && warnings.includes(placeholder);
+    const classes = isMissing ? 'border border-error/50 bg-error/10 px-1.5 py-0.5 rounded outline-none focus:ring-1 focus:ring-error transition-colors inline-block min-w-[60px]' : 'outline-none focus:bg-surface-elevated px-1.5 py-0.5 rounded transition-colors inline-block min-w-[60px] border border-transparent focus:border-border-subtle';
+    const displayVal = (key === 'roadTax' && val && typeof val === 'number') ? val.toLocaleString('en-IN') : (val || '');
+    return `<div contenteditable="true" data-key="${key}" class="${classes}" title="Click to edit">${displayVal}</div>`;
+  };
+
+  tr.innerHTML = `
+    <td><span class="status-dot ${dotClass}"></span></td>
+    <td class="mono" title="${fileName}">${fileName.length>26 ? fileName.slice(0,24)+'…' : fileName}</td>
+    <td>${sl ?? ''}</td>
+    <td>${r ? cell('customerName', r.customerName, 'Customer name') : ''}</td>
+    <td class="mono">${r ? cell('vin', r.vin, 'VIN') : ''}</td>
+    <td class="mono">${r ? cell('challanNo', r.challanNo, 'Challan No.') : ''}</td>
+    <td>${r ? cell('challanDate', r.challanDate, 'Challan date') : ''}</td>
+    <td>${r ? cell('roadTax', r.roadTax, 'Road tax amount') : ''}</td>
+    <td class="${issueClass}">${issueText}</td>
+  `;
+  if(currentFilter === 'issues' && status === 'ok') tr.classList.add('hidden-row');
+  tableBody.appendChild(tr);
+}
+
+tableBody.addEventListener('input', (e) => {
+  if(e.target.hasAttribute('contenteditable')){
+    const tr = e.target.closest('tr');
+    const idx = tr.dataset.idx;
+    const key = e.target.dataset.key;
+    if(idx !== undefined && key && currentRows[idx]){
+      let val = e.target.textContent.trim();
+      if(key === 'roadTax'){
+        const num = Number(val.replace(/,/g, ''));
+        if(!isNaN(num) && val !== '') val = num;
+      }
+      currentRows[idx][key] = val;
+      
+      // Make it look 'fixed' if it was originally an error
+      if (val) {
+         e.target.classList.remove('border-error/50', 'bg-error/10');
+         e.target.classList.add('border-transparent');
+      }
+    }
+  }
+});
+
+async function startBatch(fileList){
+  if(running) return;
+  const pdfFiles = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  if(!pdfFiles.length) return;
+
+  resetAll();
+  running = true;
+  dropZone.classList.add('compact');
+
+  statusRow.style.display = 'flex';
+  progressBarBg.style.display = 'block';
+  statsEl.style.display = 'grid';
+  tableCard.style.display = 'flex';
+  tableHeadRow.style.display = 'flex';
+  tableScroll.style.display = 'block';
+  cancelBtn.style.display = 'inline-flex';
+  resetBtn.style.display = 'none';
+
+  const total = pdfFiles.length;
+  statTotal.textContent = total;
+  currentRows = new Array(total);
+  let okCount = 0, warnCount = 0, errCount = 0, sl = 0;
+  const startTime = Date.now();
+
+  const CONCURRENCY = 6;
+  let nextIndex = 0;
+  let completed = 0;
+
+  function updateProgress(){
+    const pct = Math.round((completed/total)*100);
+    progressFill.style.width = pct + '%';
+    statOk.textContent = okCount;
+    statWarn.textContent = warnCount;
+    statErr.textContent = errCount;
+    const elapsed = (Date.now() - startTime) / 1000;
+    const rate = completed / Math.max(elapsed, 0.001);
+    const remaining = rate > 0 ? (total - completed) / rate : 0;
+    statusText.textContent = `Processing ${completed} of ${total} (${pct}%)`;
+    statusSub.textContent = completed < total
+      ? `~${fmtTime(remaining)} remaining · ${rate.toFixed(1)} files/sec`
+      : `Done in ${fmtTime(elapsed)}`;
+  }
+
+  async function worker(){
+    while(nextIndex < total){
+      if(cancelled) return;
+      const idx = nextIndex++;
+      const file = pdfFiles[idx];
+      try{
+        const buf = await file.arrayBuffer();
+        const text = await extractTextFromPdf(buf);
+        const { result, warnings } = extractFields(text);
+        currentRows[idx] = result;
+        sl++;
+        if(warnings.length){ 
+          warnCount++; 
+          issuesList.push({ idx, file: file.name, warnings, result });
+          addPreviewRow('warn', file.name, sl, result, warnings, idx); 
+        }
+        else { okCount++; addPreviewRow('ok', file.name, sl, result, warnings, idx); }
+      } catch(err){
+        errCount++;
+        currentRows[idx] = null;
+        addPreviewRow('err', file.name, '', null, [], idx);
+      }
+      completed++;
+      if(completed % 3 === 0 || completed === total) updateProgress();
+    }
+  }
+
+  const workers = [];
+  for(let w=0; w<Math.min(CONCURRENCY, total); w++) workers.push(worker());
+  await Promise.all(workers);
+  updateProgress();
+
+  const wasCancelled = cancelled;
+  spinner.style.display = 'none';
+  cancelBtn.style.display = 'none';
+  resetBtn.style.display = 'inline-flex';
+  statusText.textContent = wasCancelled
+    ? `Stopped after ${completed} of ${total} files`
+    : `Finished processing ${total} files`;
+
+  if(total > PREVIEW_CAP){
+    tableNote.style.display = 'block';
+    tableNote.textContent = `Showing the first ${PREVIEW_CAP} rows in this preview — all processed rows will be in the downloaded file.`;
+  }
+  tabAllCnt.textContent = okCount + warnCount + errCount;
+  tabIssuesCnt.textContent = warnCount + errCount;
+  applyFilter();
+
+  running = false;
+
+  if (issuesList.length > 0) {
+    tableCard.style.display = 'none'; // hide it while prompting
+    renderFixIssuesList();
+    fixIssuesCard.style.display = 'flex';
+  } else {
+    showResultBarAndTable(false);
+  }
+}
+
+const FIELD_MAP = {
+  'Customer name': 'customerName',
+  'VIN': 'vin',
+  'Challan No.': 'challanNo',
+  'Challan date': 'challanDate',
+  'Road tax amount': 'roadTax'
+};
+
+function renderFixIssuesList() {
+  fixIssuesList.innerHTML = '';
+  fixIssuesText.textContent = `We couldn't read some fields from ${issuesList.length} files. Please fill them in below to continue.`;
+  
+  issuesList.forEach(issue => {
+    const card = document.createElement('div');
+    card.className = "bg-surface-base border border-border-subtle rounded-lg p-4 flex flex-col gap-3";
+    
+    let inputsHtml = '';
+    issue.warnings.forEach(warn => {
+      const key = FIELD_MAP[warn];
+      if(!key) return;
+      inputsHtml += `
+        <div class="flex flex-col gap-1.5 flex-1 min-w-[150px]">
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider">${warn}</label>
+          <input type="text" data-idx="${issue.idx}" data-key="${key}" class="issue-input bg-surface-variant/50 border border-error/50 rounded-md px-3 py-2 text-[13px] text-text-high-contrast focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" placeholder="Enter ${warn}">
+        </div>
+      `;
+    });
+
+    card.innerHTML = `
+      <div class="text-[13px] text-text-high-contrast flex items-center gap-2 font-medium pb-2 border-b border-border-subtle">
+        <span class="material-symbols-outlined text-error text-[18px]">error</span>
+        <span class="font-mono truncate" title="${issue.file}">${issue.file}</span>
+      </div>
+      <div class="flex flex-wrap gap-4 pt-1">
+        ${inputsHtml}
+      </div>
+    `;
+    fixIssuesList.appendChild(card);
+  });
+  
+  fixIssuesList.querySelectorAll('.issue-input').forEach(input => {
+    input.addEventListener('input', (e) => {
+      if(e.target.value.trim() !== '') {
+        e.target.classList.remove('border-error/50', 'bg-error/10');
+        e.target.classList.add('border-border-subtle');
+      } else {
+        e.target.classList.add('border-error/50');
+        e.target.classList.remove('border-border-subtle');
+      }
+    });
+  });
+}
+
+confirmFixesBtn.addEventListener('click', () => {
+  const inputs = fixIssuesList.querySelectorAll('.issue-input');
+  let allFilled = true;
+  inputs.forEach(input => {
+    if(input.value.trim() === '') {
+      allFilled = false;
+      input.classList.add('bg-error/10');
+    } else {
+      input.classList.remove('bg-error/10');
+      const idx = input.dataset.idx;
+      const key = input.dataset.key;
+      let val = input.value.trim();
+      if(key === 'roadTax'){
+        const num = Number(val.replace(/,/g, ''));
+        if(!isNaN(num) && val !== '') val = num;
+      }
+      currentRows[idx][key] = val;
+    }
+  });
+  
+  if(!allFilled) return;
+  
+  const fixedCount = issuesList.length;
+  statOk.textContent = parseInt(statOk.textContent) + fixedCount;
+  statWarn.textContent = 0;
+  
+  fixIssuesCard.style.display = 'none';
+  showResultBarAndTable(true);
+});
+
+skipFixesBtn.addEventListener('click', () => {
+  fixIssuesCard.style.display = 'none';
+  showResultBarAndTable(false);
+});
+
+function showResultBarAndTable(fixed = false) {
+  resultBar.style.display = 'flex';
+  resultBar.classList.toggle('cancelled', cancelled);
+  
+  const totalProcessed = parseInt(statOk.textContent) + parseInt(statWarn.textContent);
+  
+  if (fixed) {
+    resultMsg.innerHTML = `<b class="text-[#37b980]">${totalProcessed}</b> rows processed and issues fixed. Ready to download.`;
+    resultSub.textContent = `All issues resolved`;
+    
+    issuesList.forEach(issue => {
+      const tr = tableBody.querySelector(`tr[data-idx="${issue.idx}"]`);
+      if(tr) {
+        tr.dataset.status = 'ok';
+        const dot = tr.querySelector('.status-dot');
+        if(dot) dot.className = 'status-dot ok';
+        const lastTd = tr.querySelector('td:last-child');
+        if(lastTd) {
+          lastTd.textContent = '';
+          lastTd.className = 'issue-text';
+        }
+        
+        const editableCells = tr.querySelectorAll('[contenteditable]');
+        editableCells.forEach(cell => {
+          const key = cell.dataset.key;
+          cell.className = 'outline-none focus:bg-surface-elevated px-1.5 py-0.5 rounded transition-colors inline-block min-w-[60px] border border-transparent focus:border-border-subtle';
+          let val = currentRows[issue.idx][key];
+          if(key === 'roadTax' && val) val = Number(val).toLocaleString('en-IN');
+          cell.textContent = val || '';
+        });
+      }
+    });
+    
+    tabAllCnt.textContent = totalProcessed + parseInt(statErr.textContent);
+    tabIssuesCnt.textContent = parseInt(statErr.textContent);
+    applyFilter();
+  } else {
+    resultMsg.innerHTML = cancelled
+      ? `Stopped early — <b class="${cancelled ? 'text-[#e6ab35]' : 'text-[#37b980]'}">${totalProcessed}</b> rows are ready.`
+      : `<b class="text-[#e6ab35]">${totalProcessed}</b> rows processed with some unresolved issues.`;
+    resultSub.textContent = `${statOk.textContent} clean · ${statWarn.textContent} with a missing field · ${statErr.textContent} unreadable`;
+  }
+  
+  tableCard.style.display = 'flex';
+  tableHeadRow.style.display = 'flex';
+  tableScroll.style.display = 'block';
+}
+
+downloadBtn.addEventListener('click', async ()=>{
+  if(currentRows.length === 0) return;
+  
+  const originalHtml = downloadBtn.innerHTML;
+  downloadBtn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span> Generating...';
+  downloadBtn.disabled = true;
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(b64ToArrayBuffer(TEMPLATE_B64));
+    const ws = wb.worksheets[0];
+
+    const START_ROW = 3; 
+    let rowNum = 1;
+    for(let i=0;i<currentRows.length;i++){
+      const r = currentRows[i];
+      if(!r) continue; 
+      const rowIdx = START_ROW + rowNum - 1;
+      const row = ws.getRow(rowIdx);
+      row.getCell(2).value = rowNum;          
+      row.getCell(5).value = r.customerName;  
+      row.getCell(7).value = r.vin;           
+      row.getCell(9).value = r.challanNo;     
+      row.getCell(10).value = r.challanDate;  
+      
+      let rTax = r.roadTax;
+      if(typeof rTax === 'string') {
+        const num = Number(rTax.replace(/,/g, ''));
+        if(!isNaN(num)) rTax = num;
+      }
+      row.getCell(15).value = rTax;      
+      
+      row.commit();
+      rowNum++;
+    }
+
+    const outBuf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([outBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const outputBlobUrl = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = outputBlobUrl;
+    const stamp = new Date().toISOString().slice(0,10);
+    a.download = `Road_Tax_Tracker_filled_${stamp}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    setTimeout(() => URL.revokeObjectURL(outputBlobUrl), 5000);
+  } catch(e) {
+    console.error("Excel generation error", e);
+    alert("Failed to generate Excel file.");
+  } finally {
+    downloadBtn.innerHTML = originalHtml;
+    downloadBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
