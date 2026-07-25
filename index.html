@@ -211,12 +211,15 @@
           <span class="material-symbols-outlined text-[48px] text-text-muted opacity-60 group-hover:text-inverse-primary transition-colors duration-300 drop-icon-wrapper">cloud_upload</span>
           <div class="flex flex-col gap-xs">
               <h3 class="text-[24px] md:text-[32px] font-semibold text-text-high-contrast group-hover:text-inverse-primary transition-colors duration-300 leading-tight">Drag &amp; drop RTO receipt PDFs here</h3>
-              <p class="text-text-muted text-[16px] drop-title">or click to browse — select as many files as you like, processing begins immediately</p>
+              <p class="text-text-muted text-[16px] drop-title" id="dropTitle">or click to browse — you can add files from multiple folders before processing</p>
           </div>
-          <div class="mt-sm drop-actions">
-              <label class="bg-inverse-primary text-text-high-contrast px-6 py-2.5 rounded font-medium text-[14px] hover:bg-inverse-primary/90 transition-colors cursor-pointer shadow-sm tracking-wide" for="pdfInput" onclick="event.stopPropagation()">
-                  Choose files
+          <div class="mt-sm flex flex-wrap items-center justify-center gap-3 drop-actions">
+              <label class="bg-surface-variant border border-border-subtle text-text-high-contrast px-6 py-2.5 rounded font-medium text-[14px] hover:border-text-muted transition-colors cursor-pointer shadow-sm tracking-wide" for="pdfInput" onclick="event.stopPropagation()">
+                  <span class="material-symbols-outlined text-[18px] align-text-bottom mr-1">note_add</span> Add files
               </label>
+              <button id="processBtn" class="bg-inverse-primary text-text-high-contrast px-6 py-2.5 rounded font-medium text-[14px] hover:bg-inverse-primary/90 transition-colors shadow-sm tracking-wide" style="display:none;" onclick="event.stopPropagation()">
+                  Process files
+              </button>
           </div>
           <p class="text-text-muted/60 font-mono text-[13px] mt-md max-w-lg drop-tip">
               Tip: open the folder in your file explorer, press Ctrl+A (Cmd+A on Mac) to select everything, then drag the whole selection in here — same result as picking a folder.
@@ -380,10 +383,13 @@ const fixIssuesText = document.getElementById('fixIssuesText');
 const fixIssuesList = document.getElementById('fixIssuesList');
 const confirmFixesBtn = document.getElementById('confirmFixesBtn');
 const skipFixesBtn = document.getElementById('skipFixesBtn');
+const dropTitle = document.getElementById('dropTitle');
+const processBtn = document.getElementById('processBtn');
 
 const PREVIEW_CAP = 1000;
 let currentRows = [];
 let issuesList = [];
+let pendingFiles = [];
 let cancelled = false;
 let running = false;
 let currentFilter = 'all';
@@ -395,12 +401,30 @@ dropZone.addEventListener('click', ()=> pdfInput.click());
 ['dragleave','drop'].forEach(evt=>{
   dropZone.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drop-zone-active'); });
 });
+function handleFilesAdded(files) {
+  const newPdfs = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  if(!newPdfs.length) return;
+  pendingFiles.push(...newPdfs);
+  
+  processBtn.style.display = 'inline-block';
+  processBtn.innerHTML = `<span class="material-symbols-outlined text-[18px] align-text-bottom mr-1">play_arrow</span> Process ${pendingFiles.length} file${pendingFiles.length !== 1 ? 's' : ''}`;
+  dropTitle.textContent = `${pendingFiles.length} PDF(s) staged. Add more or click Process.`;
+  dropTitle.classList.add('text-inverse-primary');
+  dropTitle.classList.remove('text-text-muted');
+}
+
+processBtn.addEventListener('click', () => {
+  if (pendingFiles.length > 0) {
+    startBatch(pendingFiles);
+  }
+});
+
 dropZone.addEventListener('drop', e=>{
   const dt = e.dataTransfer;
-  if(dt && dt.files && dt.files.length) startBatch(dt.files);
+  if(dt && dt.files && dt.files.length) handleFilesAdded(dt.files);
 });
 pdfInput.addEventListener('change', e=>{
-  if(e.target.files && e.target.files.length) startBatch(e.target.files);
+  if(e.target.files && e.target.files.length) handleFilesAdded(e.target.files);
   e.target.value = '';
 });
 
@@ -425,6 +449,13 @@ function resetAll(){
   currentFilter = 'all';
   currentRows = [];
   issuesList = [];
+  pendingFiles = [];
+  if(processBtn) processBtn.style.display = 'none';
+  if(dropTitle) {
+    dropTitle.textContent = 'or click to browse — you can add files from multiple folders before processing';
+    dropTitle.classList.remove('text-inverse-primary');
+    dropTitle.classList.add('text-text-muted');
+  }
   if(fixIssuesCard) fixIssuesCard.style.display = 'none';
   tabAll.classList.add('active'); tabIssues.classList.remove('active');
 }
