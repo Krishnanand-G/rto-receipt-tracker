@@ -843,6 +843,14 @@ downloadBtn.addEventListener('click', async ()=>{
     await wb.xlsx.load(b64ToArrayBuffer(TEMPLATE_B64));
     const ws = wb.worksheets[0];
 
+    // Extend template styles for the new RTO column across all rows
+    ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+      if (rowNumber === 2) {
+        row.getCell(16).value = "RTO";
+      }
+      row.getCell(16).style = row.getCell(15).style;
+    });
+
     const START_ROW = 3; 
     let rowNum = 1;
     for(let i=0;i<currentRows.length;i++){
@@ -863,18 +871,22 @@ downloadBtn.addEventListener('click', async ()=>{
       }
       row.getCell(15).value = rTax;      
       row.getCell(16).value = r.rto;
-      row.getCell(16).style = row.getCell(15).style;
-      
-      if (rowNum === 1) {
-        const headRow = ws.getRow(2);
-        headRow.getCell(16).value = "RTO";
-        headRow.getCell(16).style = headRow.getCell(15).style;
-        ws.getColumn(16).width = 15;
-        headRow.commit();
-      }
       
       row.commit();
       rowNum++;
+    }
+
+    // Auto-fit all columns based on content
+    for (let i = 1; i <= Math.max(ws.columnCount || 16, 16); i++) {
+      let maxLength = 8;
+      const col = ws.getColumn(i);
+      col.eachCell({ includeEmpty: true }, cell => {
+        if (cell.value !== null && cell.value !== undefined) {
+          const len = cell.value.toString().length;
+          if (len > maxLength) maxLength = len;
+        }
+      });
+      col.width = maxLength + 2;
     }
 
     const outBuf = await wb.xlsx.writeBuffer();
