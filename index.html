@@ -486,9 +486,13 @@ function extractFields(text){
   const warnings = [];
   let m;
 
-  m = text.match(/([A-Z]{2}[-\s]?\d{2})\s*-[A-Z0-9-]+/i);
-  if(m) result.rto = m[1].toUpperCase().replace('-', ' ');
-  else warnings.push('RTO');
+  const rtoMatches = [...text.matchAll(/([A-Z]{2}[-\s]?\d{2})\s*-/gi)];
+  if(rtoMatches.length) {
+    const raw = rtoMatches[rtoMatches.length - 1][1].toUpperCase().replace(/[-\s]/g, '');
+    result.rto = raw.slice(0, 2) + ' ' + raw.slice(2);
+  } else {
+    warnings.push('RTO');
+  }
 
   m = text.match(/RECEIPT\/APPL\s*No\s*:\s*([A-Za-z0-9]+)\s*\//);
   if(m) result.challanNo = m[1].trim();
@@ -859,10 +863,13 @@ downloadBtn.addEventListener('click', async ()=>{
       }
       row.getCell(15).value = rTax;      
       row.getCell(16).value = r.rto;
+      row.getCell(16).style = row.getCell(15).style;
       
       if (rowNum === 1) {
         const headRow = ws.getRow(2);
         headRow.getCell(16).value = "RTO";
+        headRow.getCell(16).style = headRow.getCell(15).style;
+        ws.getColumn(16).width = 15;
         headRow.commit();
       }
       
