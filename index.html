@@ -318,6 +318,7 @@
           <th class="px-3 py-2.5 border-b border-border-subtle">Challan No.</th>
           <th class="px-3 py-2.5 border-b border-border-subtle">Challan Date</th>
           <th class="px-3 py-2.5 border-b border-border-subtle">Road Tax</th>
+          <th class="px-3 py-2.5 border-b border-border-subtle">RTO</th>
           <th class="px-3 py-2.5 border-b border-border-subtle">Issue</th>
         </tr>
       </thead>
@@ -481,9 +482,13 @@ function applyFilter(){
 const MONTHS = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
 
 function extractFields(text){
-  const result = { customerName:'', vin:'', challanNo:'', challanDate:'', roadTax:'' };
+  const result = { customerName:'', vin:'', challanNo:'', challanDate:'', roadTax:'', rto:'' };
   const warnings = [];
   let m;
+
+  m = text.match(/([A-Z]{2}[-\s]?\d{2})\s*-[A-Z0-9-]+/i);
+  if(m) result.rto = m[1].toUpperCase().replace('-', ' ');
+  else warnings.push('RTO');
 
   m = text.match(/RECEIPT\/APPL\s*No\s*:\s*([A-Za-z0-9]+)\s*\//);
   if(m) result.challanNo = m[1].trim();
@@ -554,6 +559,7 @@ function addPreviewRow(status, fileName, sl, r, warnings, rowIdx){
     <td class="mono">${r ? cell('challanNo', r.challanNo, 'Challan No.') : ''}</td>
     <td>${r ? cell('challanDate', r.challanDate, 'Challan date') : ''}</td>
     <td>${r ? cell('roadTax', r.roadTax, 'Road tax amount') : ''}</td>
+    <td>${r ? cell('rto', r.rto, 'RTO') : ''}</td>
     <td class="${issueClass}">${issueText}</td>
   `;
   if(currentFilter === 'issues' && status === 'ok') tr.classList.add('hidden-row');
@@ -689,7 +695,8 @@ const FIELD_MAP = {
   'VIN': 'vin',
   'Challan No.': 'challanNo',
   'Challan date': 'challanDate',
-  'Road tax amount': 'roadTax'
+  'Road tax amount': 'roadTax',
+  'RTO': 'rto'
 };
 
 function renderFixIssuesList() {
@@ -851,6 +858,13 @@ downloadBtn.addEventListener('click', async ()=>{
         if(!isNaN(num)) rTax = num;
       }
       row.getCell(15).value = rTax;      
+      row.getCell(16).value = r.rto;
+      
+      if (rowNum === 1) {
+        const headRow = ws.getRow(2);
+        headRow.getCell(16).value = "RTO";
+        headRow.commit();
+      }
       
       row.commit();
       rowNum++;
